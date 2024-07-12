@@ -1,0 +1,63 @@
+blueprint:
+  name: Turn On Lights with Motion or Door Sensor
+  description: Turn On Lights when occupancy
+  domain: automation
+  input:
+    entity_activator:
+      name: Motion/Door Sensor
+      selector:
+        entity: {}
+    entity_light:
+      name: Light Entity
+      selector:
+        entity: {}
+    only_night:
+      name: Only at Night
+      description: Turns on only at night (based on Sun entity)
+      default: false
+      selector:
+        boolean:
+    seconds_delayed:
+      name: Seconds for turning off
+      description: Turn off after x seconds
+      default: 0
+      selector:
+        number:
+  source_url: https://github.com/jonathanandujo/home-assistant/blueprints/lights.yaml
+mode: restart
+max_exceeded: silent
+variables:
+  entity_activator: !input entity_activator
+  entity_light: !input entity_light
+  only_night: !input only_night
+  is_night: "{{ is_state('sun.sun', 'below_horizon') }}"
+trigger:
+- platform: state
+  entity_id: !input entity_activator
+  to:
+  - 'on'
+- platform: state
+  entity_id: !input entity_activator
+  to:
+  - 'off'
+  for:
+    seconds: !input seconds_delayed
+condition:
+- condition: template
+  value_template: '{{ states(entity_activator) != states(entity_light) }}'
+action:
+- choose:
+  - conditions:
+    - condition: template
+      value_template: '{{ trigger.to_state.state == "off" }}'
+    sequence:
+    - service: homeassistant.turn_off
+      data:
+        entity_id: '{{ entity_light }}'
+  - conditions:
+    - condition: template
+      value_template: '{{ only_night == false or (only_night and  is_night) }}'
+    sequence:
+    - service: homeassistant.turn_on
+      data:
+        entity_id: '{{ entity_light }}'
